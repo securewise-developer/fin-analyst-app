@@ -33,6 +33,7 @@ A professional-grade financial analysis and trading monitoring application with 
 
 ### 📱 **Integrations**
 - **Slack Bot**: Automated notifications with rich formatting
+- **Slack Slash Commands**: `/analyze AAPL MSFT` directly in Slack
 - **Multiple Data Sources**: Yahoo Finance, FMP, News APIs
 - **CLI Interface**: Command-line tools for automation
 - **Docker Ready**: Containerization support
@@ -137,6 +138,22 @@ curl -X POST http://localhost:8080/api/v1/analyze \
      -d '{"symbols": ["AAPL", "MSFT"], "detailed": true}'
 ```
 
+### **POST /api/v1/slack/analyze**
+
+Slack slash command endpoint for `/analyze` commands.
+
+**Slack Command Usage:**
+```
+/analyze AAPL MSFT GOOGL
+```
+
+**Features:**
+- Accepts up to 5 symbols per command
+- Returns immediate confirmation to Slack
+- Sends detailed results when analysis completes
+- Rich formatting with grades, scores, and trading signals
+- User attribution in notifications
+
 ### **GET /api/v1/status**
 
 Get application configuration and status.
@@ -213,13 +230,27 @@ python3 -m cli.commands status
 
 ## 📱 Slack Integration
 
-The app automatically sends rich, formatted notifications to Slack:
+### **Slash Commands**
+Use `/analyze` directly in Slack:
+```
+/analyze AAPL MSFT GOOGL NVDA TSLA
+```
 
+### **Rich Notifications**
+The app automatically sends beautifully formatted notifications:
+
+- **🟢 Grade A-F** with color-coded emojis
 - **Trading Signals** with confidence levels
 - **Entry/Exit Points** with precise prices
 - **Risk Analysis** with key factors
-- **Market Updates** with sentiment analysis
-- **Portfolio Recommendations** with position sizing
+- **User Attribution** showing who requested analysis
+- **Trading Opportunities** highlighted prominently
+
+### **Setup for Slash Commands**
+1. Create a Slack App at https://api.slack.com/apps
+2. Add `/analyze` slash command pointing to: `https://your-domain.com/api/v1/slack/analyze`
+3. Add required scopes: `chat:write`, `commands`
+4. Install app to your workspace
 
 ## 🔧 Configuration
 

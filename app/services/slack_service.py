@@ -13,7 +13,16 @@ class SlackService:
         self.config = config or get_config()
         self.client = None
         if self.config.SLACK_BOT_TOKEN:
-            self.client = WebClient(token=self.config.SLACK_BOT_TOKEN)
+            # Create client with SSL handling for development
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            self.client = WebClient(
+                token=self.config.SLACK_BOT_TOKEN,
+                ssl=ssl_context
+            )
         
         self.logger = logging.getLogger(__name__)
     
@@ -65,6 +74,114 @@ class SlackService:
             self.logger.error(f"Slack API error: {e.response['error']}")
             raise
     
+    def send_analysis_complete_notification(self, symbols: list, summary_data: dict, user_name: str = None):
+        """Send a structured notification when analysis is complete."""
+        if not self.is_configured():
+            self.logger.warning("No Slack token configured, skipping notification")
+            return
+        
+        try:
+            symbol_list = ", ".join(symbols)
+            
+            # Create blocks for rich formatting
+            blocks = [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "📊 Financial Analysis Complete"
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Symbols Analyzed:* {symbol_list}"
+                    }
+                }
+            ]
+            
+            # Add user mention if provided
+            if user_name:
+                blocks.append({
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"Requested by: @{user_name}"
+                        }
+                    ]
+                })
+            
+            # Add analysis results for each symbol
+            for symbol, analysis in summary_data.get("last_analysis", {}).items():
+                grade = analysis.get("grade", "N/A")
+                score = analysis.get("score", "N/A")
+                
+                # Choose emoji based on grade
+                grade_emoji = {
+                    "A": "🟢", "B": "🔵", "C": "🟡", "D": "🟠", "F": "🔴"
+                }.get(grade, "⚪")
+                
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"{grade_emoji} *{symbol}*\n*Grade:* {grade} | *Score:* {score:.2f}" if isinstance(score, (int, float)) else f"{grade_emoji} *{symbol}*\n*Grade:* {grade} | *Score:* {score}"
+                    }
+                })
+            
+            # Add opportunities if any
+            opportunities = summary_data.get("trading_opportunities", [])
+            if opportunities:
+                blocks.append({
+                    "type": "divider"
+                })
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"🎯 *Trading Opportunities Found:* {len(opportunities)}"
+                    }
+                })
+                
+                for opp in opportunities[:3]:  # Show top 3 opportunities
+                    action_emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "🟡"}.get(opp.get("action", "").upper(), "⚪")
+                    blocks.append({
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn", 
+                            "text": f"{action_emoji} *{opp['symbol']}* - {opp['action']} (Confidence: {opp['confidence']:.0%})"
+                        }
+                    })
+            
+            # Add footer
+            blocks.append({
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": "💡 *Tip:* Use `/analyze SYMBOL1 SYMBOL2` to analyze more stocks"
+                    }
+                ]
+            })
+            
+            response = self.client.chat_postMessage(
+                channel=self.config.SLACK_CHANNEL,
+                blocks=blocks,
+                text=f"Analysis complete for {symbol_list}"  # Fallback text
+            )
+            
+            self.logger.info(f"Analysis completion notification sent to Slack")
+            return response
+            
+        except SlackApiError as e:
+            self.logger.error(f"Slack API error: {e.response['error']}")
+            raise
+        except Exception as e:
+            self.logger.exception("Error sending analysis completion notification")
+            raise
+    
     def _format_trading_summary(self, summary: dict) -> str:
         """Format trading summary for Slack display."""
         return format_trading_summary(summary)
@@ -84,98 +201,124 @@ def format_trading_summary(summary: dict) -> str:
     detailed_analysis = summary.get("detailed_analysis", {})
 
     lines = [
-        f"📅 *Trading Summary* ({ts})",
-        f"👀 Symbols monitored: *{symbols_count}*",
-        f"🚨 Active alerts: *{active_alerts}*",
+        f"📊 *DETAILED TRADING ANALYSIS*",
+        f"⏰ *Analysis Time:* {ts[:19].replace('T', ' ')}",
+        f"📈 *Symbols Analyzed:* {symbols_count} | 🚨 *Active Alerts:* {active_alerts}",
+        "─────────────────────────────────",
         ""
     ]
 
+    # Quick overview of all symbols first
     for symbol, analysis in last_analysis.items():
         grade = analysis.get("grade", "N/A")
         score = analysis.get("score", "N/A")
-        last_update = analysis.get("last_update", "N/A")
-        lines.append(f"📊 *{symbol}* - Grade: *{grade}*, Score: {score}, Last update: {last_update}")
+        
+        # Grade emoji
+        grade_emoji = {"A": "🟢", "B": "🔵", "C": "🟡", "D": "🟠", "F": "🔴"}.get(grade, "⚪")
+        
+        score_display = f"{score:.2f}" if isinstance(score, (int, float)) else str(score)
+        lines.append(f"{grade_emoji} *{symbol}* - Grade: *{grade}* | Score: *{score_display}*")
 
-    lines.append("")
+    lines.extend(["", "═══════ DETAILED ANALYSIS ═══════", ""])
 
+    # Detailed analysis for each symbol
     for symbol, details in detailed_analysis.items():
-        lines.append(f"🔍 *Detailed Analysis for {symbol}*")
+        lines.append(f"🔍 *{symbol} - COMPREHENSIVE ANALYSIS*")
+        lines.append("─" * 30)
+        
         trading_signal = details.get("trading_signal", {})
         action = trading_signal.get("action", "N/A")
         confidence = trading_signal.get("confidence", "N/A")
         position_size = trading_signal.get("position_size", "N/A")
         time_horizon = trading_signal.get("time_horizon", "N/A")
+
+        # Trading Signal Section
+        action_emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "🟡"}.get(action.upper(), "⚪")
+        confidence_display = f"{confidence:.0%}" if isinstance(confidence, (int, float)) else str(confidence)
+        
+        lines.extend([
+            f"🎯 *TRADING SIGNAL*",
+            f"   {action_emoji} *Action:* {action} | *Confidence:* {confidence_display}",
+            f"   ⏱️ *Time Horizon:* {time_horizon}",
+            f"   💹 *Position Size:* {position_size}",
+        ])
+
+        # Price Targets
         entry_price = trading_signal.get("entry_price")
-        exit_price = trading_signal.get("exit_price")
         stop_loss = trading_signal.get("stop_loss")
         take_profit = trading_signal.get("take_profit")
+        
+        if any([entry_price, stop_loss, take_profit]):
+            lines.append(f"💰 *PRICE TARGETS*")
+            if entry_price is not None:
+                lines.append(f"   💵 Entry: ${entry_price}")
+            if stop_loss is not None:
+                lines.append(f"   🛑 Stop Loss: ${stop_loss}")
+            if take_profit is not None:
+                lines.append(f"   🎯 Take Profit: ${take_profit}")
 
-        # Emoji for action
-        action_emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "🟡"}.get(action.upper(), "⚪")
-        lines.append(f"🎯 Trading Signal: {action_emoji} *{action}* (Confidence: {confidence})")
-        lines.append(f"⏱️ Time Horizon: {time_horizon}")
-        lines.append(f"💹 Position Size: {position_size}")
-
-        # Prices
-        if entry_price is not None:
-            lines.append(f"💵 Entry Price: {entry_price}")
-        if exit_price is not None:
-            lines.append(f"🏁 Exit Price: {exit_price}")
-        if stop_loss is not None:
-            lines.append(f"🛑 Stop Loss: {stop_loss}")
-        if take_profit is not None:
-            lines.append(f"🎯 Take Profit: {take_profit}")
-
-        # Fundamental reasons
+        # Analysis Reasons
         fr = trading_signal.get("fundamental_reasons", [])
         if fr:
-            lines.append("📈 Fundamental Reasons:")
-            for r in fr:
-                lines.append(f"    • {r}")
+            lines.append(f"📈 *FUNDAMENTAL REASONS*")
+            for r in fr[:3]:  # Limit to top 3 for readability
+                lines.append(f"   • {r}")
 
-        # Technical reasons
         tr = trading_signal.get("technical_reasons", [])
         if tr:
-            lines.append("📊 Technical Reasons:")
-            for r in tr:
-                lines.append(f"    • {r}")
+            lines.append(f"📊 *TECHNICAL REASONS*")
+            for r in tr[:3]:  # Limit to top 3
+                lines.append(f"   • {r}")
 
-        # News catalysts
         nc = trading_signal.get("news_catalysts", [])
         if nc:
-            lines.append("📰 News Catalysts:")
-            for c in nc:
-                lines.append(f"    • {c}")
+            lines.append(f"📰 *NEWS CATALYSTS*")
+            for c in nc[:3]:  # Limit to top 3
+                lines.append(f"   • {c}")
 
-        # Market timing
+        # Market Context
         mt = trading_signal.get("market_timing")
         if mt:
-            lines.append(f"⏰ Market Timing: {mt}")
+            lines.extend([
+                f"⏰ *MARKET TIMING*",
+                f"   {mt}"
+            ])
 
-        # Risk factors
+        # Risk Assessment
         rf = details.get("risk_factors", [])
         if rf:
-            lines.append("⚠️ Risk Factors:")
-            for r in rf:
-                lines.append(f"    • {r}")
+            lines.append(f"⚠️ *RISK FACTORS*")
+            for r in rf[:3]:  # Limit to top 3
+                lines.append(f"   • {r}")
 
-        # Key drivers
+        # Key Growth Drivers
         kd = details.get("key_drivers", [])
         if kd:
-            lines.append("🚀 Key Drivers:")
-            for d in kd:
-                lines.append(f"    • {d}")
+            lines.append(f"🚀 *KEY DRIVERS*")
+            for d in kd[:3]:  # Limit to top 3
+                lines.append(f"   • {d}")
 
-        # Contrarian views
-        cv = details.get("contrarian_views")
-        if cv:
-            lines.append(f"🤔 Contrarian Views: {cv}")
-
-        # Overall analysis
+        # Overall Assessment
         overall = details.get("overall_analysis")
         if overall:
-            lines.append(f"📝 Overall: {overall}")
+            lines.extend([
+                f"📝 *OVERALL ASSESSMENT*",
+                f"   {overall[:200]}{'...' if len(overall) > 200 else ''}"  # Truncate for readability
+            ])
 
-        lines.append("")  # blank line between symbols
+        # Contrarian Views
+        cv = details.get("contrarian_views")
+        if cv:
+            lines.extend([
+                f"🤔 *CONTRARIAN VIEWS*",
+                f"   {cv[:150]}{'...' if len(cv) > 150 else ''}"  # Truncate for readability
+            ])
+
+        lines.extend(["", "─" * 30, ""])  # Separator between symbols
+
+    lines.extend([
+        "🎯 *Analysis powered by AI | Use responsibly*",
+        "💡 *Tip:* Use `/analyze SYMBOL1 SYMBOL2` for more analysis"
+    ])
 
     return "\n".join(lines)
