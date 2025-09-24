@@ -2,3 +2,4 @@
 /.venv
 /.vscode
 .env
+trading_summary.json
