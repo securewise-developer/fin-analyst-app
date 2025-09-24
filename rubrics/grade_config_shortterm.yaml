@@ -1,0 +1,20 @@
+weights:
+  fundamentals: 0.2 # kısa vadede fundamentals daha az önemli
+  technicals: 0.7 # teknik göstergeler ön planda
+  news: 0.1 # haberler hafif etkili
+
+fundamentals:
+  min_gross_margin: 0.1 # kısa vadede esnetildi
+  min_fcf_yield: 0.01 # kısa vadede çok önemi yok
+  max_net_debt_to_ebitda: 5 # borç sınırı gevşetildi
+  min_rev_cagr_3y: 0.01 # kısa vadede rev growth çok etkili değil
+
+technicals:
+  rsi_overbought: 70 # RSI overbought eşiği klasik
+  rsi_oversold: 30 # RSI oversold eşiği klasik
+  above_sma200_bonus: 0.2 # trendin kısa vadede etkisi artırıldı
+  macd_signal_bias: 0.1 # MACD sinyal ağırlığı artırıldı
+
+news:
+  negative_headline_penalty: -0.05 # kısa vadede haber etkisi azaltıldı
+  positive_headline_bonus: 0.05

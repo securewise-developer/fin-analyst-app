@@ -1,0 +1,7 @@
+Kurumsal analiz yönergeleri:
+- Net Debt/EBITDA 3x üzeri: uyarı bayrağı.
+- 3Y gelir CAGR > %5: olumlu.
+- FCF/EV anlamlı ise değerleme ucuz olabilir.
+- ETF’lerde gider oranı (TER) < %0.20 tercih.
+- Haberlerde düzenleyici riskler kırmızı bayrak.
+- Yatırım tavsiyesi verme; yalnızca analitik çıkarım ve gerekçe sun.

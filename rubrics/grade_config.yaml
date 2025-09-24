@@ -1,0 +1,20 @@
+weights:
+  fundamentals: 0.5 # Şirketin temel finansalları toplam notun %50'sini belirler (uzun vadeli değer)
+  technicals: 0.3 # Teknik göstergeler giriş/çıkış için %30 ağırlık
+  news: 0.2 # Haber akışı kısa vadeli hareketleri etkiler, %20 ağırlık
+
+fundamentals:
+  min_gross_margin: 0.25 # Brüt kar marjı ≥ 25% → iş modeli sağlıklı
+  min_fcf_yield: 0.03 # Free Cash Flow / Market Cap ≥ 3% → değer üretimi
+  max_net_debt_to_ebitda: 3.0 # Borç / EBITDA ≤ 3 → borç yönetilebilir
+  min_rev_cagr_3y: 0.05 # Son 3 yılda gelir büyüme CAGR ≥ 5% → sürdürülebilir büyüme
+
+technicals:
+  rsi_overbought: 70 # RSI > 70 → aşırı alım sinyali (düşüş riski)
+  rsi_oversold: 30 # RSI < 30 → aşırı satım sinyali (alım fırsatı)
+  above_sma200_bonus: 0.1 # Fiyat 200 günlük SMA üzerinde → trend yönü pozitif
+  macd_signal_bias: 0.05 # MACD > sinyal çizgisi → momentum pozitif, ufak katkı
+
+news:
+  negative_headline_penalty: -0.1 # Negatif haber → puanda ceza
+  positive_headline_bonus: 0.1 # Pozitif haber → puanda bonus

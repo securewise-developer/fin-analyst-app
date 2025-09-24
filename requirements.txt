@@ -1,0 +1,15 @@
+python-dotenv
+pydantic>=2
+pandas
+numpy
+yfinance
+requests
+ta
+vaderSentiment
+langchain>=0.2
+langchain-openai
+tiktoken
+pyyaml
+schedule
+slack_sdk
+flask
