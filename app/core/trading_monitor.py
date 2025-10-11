@@ -1,6 +1,7 @@
 from __future__ import annotations
 import time
 import schedule
+import traceback
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from pathlib import Path
@@ -111,7 +112,8 @@ class TradingMonitor:
             
         except Exception as e:
             print(f"Error analyzing {symbol}: {e}")
-            e.stack_trace
+            stack_trace = traceback.format_exc()
+            print(stack_trace)
             return {"symbol": symbol, "error": str(e)}
     
     def check_trading_opportunities(self) -> List[Dict]:
